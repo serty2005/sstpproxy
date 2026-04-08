@@ -49,7 +49,7 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Runtime,
 		Config:   cfg,
 		Logger:   logger,
 		Services: services,
-		HTTP:     httpapi.NewRouter(services, logger),
+		HTTP:     httpapi.NewRouter(services, logger, cfg.ControlPlaneAdminToken),
 		Bot:      telegram.NewBot(cfg, services, logger),
 		store:    store,
 	}, nil

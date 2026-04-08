@@ -110,13 +110,14 @@ type HealthReport struct {
 }
 
 type ReadinessReport struct {
-	Status        string    `json:"status"`
-	Time          time.Time `json:"time"`
-	Storage       string    `json:"storage"`
-	Docker        string    `json:"docker"`
-	ActiveKeyset  string    `json:"active_keyset"`
-	XrayConfig    string    `json:"xray_config"`
-	MTProtoConfig string    `json:"mtproto_config"`
+	Status               string    `json:"status"`
+	Time                 time.Time `json:"time"`
+	Storage              string    `json:"storage"`
+	Docker               string    `json:"docker"`
+	ActiveKeyset         string    `json:"active_keyset"`
+	XrayConfig           string    `json:"xray_config"`
+	XrayConfigValidation string    `json:"xray_config_validation"`
+	MTProtoConfig        string    `json:"mtproto_config"`
 }
 
 type UserRepository interface {

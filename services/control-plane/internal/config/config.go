@@ -11,16 +11,17 @@ import (
 )
 
 type Config struct {
-	AppEnv             string
-	LogLevel           string
-	HTTPListenAddr     string
-	StorageDriver      string
-	DatabaseURL        string
-	SQLitePath         string
-	MigrationsDir      string
-	TelegramAdminIDs   map[int64]struct{}
-	TelegramBotToken   string
-	TelegramAPIBaseURL string
+	AppEnv                 string
+	LogLevel               string
+	HTTPListenAddr         string
+	ControlPlaneAdminToken string
+	StorageDriver          string
+	DatabaseURL            string
+	SQLitePath             string
+	MigrationsDir          string
+	TelegramAdminIDs       map[int64]struct{}
+	TelegramBotToken       string
+	TelegramAPIBaseURL     string
 
 	PublicHost string
 
@@ -59,38 +60,39 @@ type Config struct {
 
 func Load() (Config, error) {
 	cfg := Config{
-		AppEnv:                getEnv("APP_ENV", "development"),
-		LogLevel:              getEnv("LOG_LEVEL", "info"),
-		HTTPListenAddr:        getEnv("HTTP_LISTEN_ADDR", ":8080"),
-		StorageDriver:         strings.ToLower(getEnv("STORAGE_DRIVER", "sqlite")),
-		DatabaseURL:           os.Getenv("DATABASE_URL"),
-		SQLitePath:            getEnv("SQLITE_PATH", filepath.Clean("control-plane.db")),
-		MigrationsDir:         getEnv("MIGRATIONS_DIR", "./migrations"),
-		TelegramBotToken:      os.Getenv("TELEGRAM_BOT_TOKEN"),
-		TelegramAPIBaseURL:    strings.TrimRight(getEnv("TELEGRAM_API_BASE_URL", "https://api.telegram.org"), "/"),
-		PublicHost:            strings.TrimSpace(os.Getenv("PUBLIC_HOST")),
-		XrayFlow:              getEnv("XRAY_FLOW", "xtls-rprx-vision"),
-		XrayClientFingerprint: getEnv("XRAY_CLIENT_FP", "chrome"),
-		XrayRealityDest:       strings.TrimSpace(os.Getenv("XRAY_REALITY_DEST")),
-		XrayServerTemplate:    getEnv("XRAY_SERVER_TEMPLATE", "infra/xray/templates/config.json.tmpl"),
-		XrayNekorayTemplate:   getEnv("XRAY_NEKORAY_TEMPLATE", "infra/xray/templates/client/nekoray.json.tmpl"),
-		XrayHiddifyTemplate:   getEnv("XRAY_HIDDIFY_TEMPLATE", "infra/xray/templates/client/hiddify.json.tmpl"),
-		XrayV2RayNTemplate:    getEnv("XRAY_V2RAYN_TEMPLATE", "infra/xray/templates/client/v2rayn.json.tmpl"),
-		XrayActiveConfigPath:  getEnv("XRAY_ACTIVE_CONFIG_PATH", "infra/xray/generated/config.json"),
-		XrayArchiveDir:        getEnv("XRAY_ARCHIVE_DIR", "infra/xray/generated/history"),
-		XrayBinaryPath:        getEnv("XRAY_BINARY_PATH", "xray"),
-		XrayContainerName:     getEnv("XRAY_CONTAINER_NAME", "xray-edge"),
-		RealityKeysetName:     getEnv("REALITY_KEYSET_NAME", "primary"),
-		RealitySecretDir:      getEnv("REALITY_SECRET_DIR", "deploy/secrets/reality"),
-		RealityPrivateKeyFile: getEnv("REALITY_PRIVATE_KEY_FILE_NAME", "active.key"),
-		MTProtoTemplate:       getEnv("MTPROTO_TEMPLATE", "infra/mtg/mtg.toml.tmpl"),
-		MTProtoActiveConfig:   getEnv("MTPROTO_ACTIVE_CONFIG_PATH", "infra/mtg/generated/mtg.toml"),
-		MTProtoArchiveDir:     getEnv("MTPROTO_ARCHIVE_DIR", "infra/mtg/generated/history"),
-		MTProtoPublicHost:     strings.TrimSpace(os.Getenv("MTPROTO_PUBLIC_HOST")),
-		MTProtoSecretFile:     getEnv("MTPROTO_SECRET_FILE", "deploy/secrets/mtproto/secret"),
-		MTProtoSecretName:     getEnv("MTPROTO_SECRET_NAME", "primary"),
-		MTProtoContainer:      getEnv("MTPROTO_CONTAINER_NAME", "mtg-edge"),
-		DockerAPIBaseURL:      strings.TrimRight(getEnv("DOCKER_API_BASE_URL", "http://localhost:2375"), "/"),
+		AppEnv:                 getEnv("APP_ENV", "development"),
+		LogLevel:               getEnv("LOG_LEVEL", "info"),
+		HTTPListenAddr:         getEnv("HTTP_LISTEN_ADDR", ":8080"),
+		ControlPlaneAdminToken: strings.TrimSpace(os.Getenv("CONTROL_PLANE_ADMIN_TOKEN")),
+		StorageDriver:          strings.ToLower(getEnv("STORAGE_DRIVER", "sqlite")),
+		DatabaseURL:            os.Getenv("DATABASE_URL"),
+		SQLitePath:             getEnv("SQLITE_PATH", filepath.Clean("control-plane.db")),
+		MigrationsDir:          getEnv("MIGRATIONS_DIR", "./migrations"),
+		TelegramBotToken:       os.Getenv("TELEGRAM_BOT_TOKEN"),
+		TelegramAPIBaseURL:     strings.TrimRight(getEnv("TELEGRAM_API_BASE_URL", "https://api.telegram.org"), "/"),
+		PublicHost:             strings.TrimSpace(os.Getenv("PUBLIC_HOST")),
+		XrayFlow:               getEnv("XRAY_FLOW", "xtls-rprx-vision"),
+		XrayClientFingerprint:  getEnv("XRAY_CLIENT_FP", "chrome"),
+		XrayRealityDest:        strings.TrimSpace(os.Getenv("XRAY_REALITY_DEST")),
+		XrayServerTemplate:     getEnv("XRAY_SERVER_TEMPLATE", "infra/xray/templates/config.json.tmpl"),
+		XrayNekorayTemplate:    getEnv("XRAY_NEKORAY_TEMPLATE", "infra/xray/templates/client/nekoray.json.tmpl"),
+		XrayHiddifyTemplate:    getEnv("XRAY_HIDDIFY_TEMPLATE", "infra/xray/templates/client/hiddify.json.tmpl"),
+		XrayV2RayNTemplate:     getEnv("XRAY_V2RAYN_TEMPLATE", "infra/xray/templates/client/v2rayn.json.tmpl"),
+		XrayActiveConfigPath:   getEnv("XRAY_ACTIVE_CONFIG_PATH", "infra/xray/generated/config.json"),
+		XrayArchiveDir:         getEnv("XRAY_ARCHIVE_DIR", "infra/xray/generated/history"),
+		XrayBinaryPath:         getEnv("XRAY_BINARY_PATH", "xray"),
+		XrayContainerName:      getEnv("XRAY_CONTAINER_NAME", "xray-edge"),
+		RealityKeysetName:      getEnv("REALITY_KEYSET_NAME", "primary"),
+		RealitySecretDir:       getEnv("REALITY_SECRET_DIR", "deploy/secrets/reality"),
+		RealityPrivateKeyFile:  getEnv("REALITY_PRIVATE_KEY_FILE_NAME", "active.key"),
+		MTProtoTemplate:        getEnv("MTPROTO_TEMPLATE", "infra/mtg/mtg.toml.tmpl"),
+		MTProtoActiveConfig:    getEnv("MTPROTO_ACTIVE_CONFIG_PATH", "infra/mtg/generated/mtg.toml"),
+		MTProtoArchiveDir:      getEnv("MTPROTO_ARCHIVE_DIR", "infra/mtg/generated/history"),
+		MTProtoPublicHost:      strings.TrimSpace(os.Getenv("MTPROTO_PUBLIC_HOST")),
+		MTProtoSecretFile:      getEnv("MTPROTO_SECRET_FILE", "deploy/secrets/mtproto/secret"),
+		MTProtoSecretName:      getEnv("MTPROTO_SECRET_NAME", "primary"),
+		MTProtoContainer:       getEnv("MTPROTO_CONTAINER_NAME", "mtg-edge"),
+		DockerAPIBaseURL:       strings.TrimRight(getEnv("DOCKER_API_BASE_URL", "http://localhost:2375"), "/"),
 	}
 
 	var err error

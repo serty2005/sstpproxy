@@ -18,6 +18,8 @@ services:
       start_period: 15s
     networks:
       - backend
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
 
@@ -54,6 +56,8 @@ services:
     tmpfs:
       - /run:rw,noexec,nosuid,size=8m
       - /tmp:rw,noexec,nosuid,size=8m
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
 
@@ -61,13 +65,21 @@ services:
     build:
       context: ../../infra/sstp-egress
       dockerfile: Dockerfile
+      args:
+        SSTP_IMAGE_TAG: ${SSTP_IMAGE_TAG}
+        SSTP_IMAGE_DIGEST: ${SSTP_IMAGE_DIGEST}
     restart: unless-stopped
+    cap_drop:
+      - ALL
     cap_add:
       - NET_ADMIN
     devices:
       - /dev/ppp:/dev/ppp
     security_opt:
+      # pppd/sstpc используют PPP ioctls через /dev/ppp, которые стандартный seccomp Docker
+      # часто блокирует, поэтому профиль оставлен unconfined.
       - seccomp:unconfined
+      - no-new-privileges:true
     sysctls:
       net.ipv4.ip_forward: "1"
       net.ipv4.conf.all.rp_filter: "0"
@@ -86,10 +98,13 @@ services:
     dns:
       - 1.1.1.1
       - 8.8.8.8
+    tmpfs:
+      - /run:rw,noexec,nosuid,size=16m
+      - /tmp:rw,noexec,nosuid,size=16m
     healthcheck:
       test: ["CMD-SHELL", "/usr/local/bin/sstp-healthcheck"]
       interval: 20s
-      timeout: 5s
+      timeout: 8s
       retries: 3
       start_period: 45s
     stop_grace_period: 20s
@@ -97,7 +112,7 @@ services:
       - edge
 
   xray-edge:
-    image: ghcr.io/xtls/xray-core:${XRAY_IMAGE_TAG}
+    image: ghcr.io/xtls/xray-core:${XRAY_VERSION}
     restart: unless-stopped
     network_mode: "service:sstp-egress"
     depends_on:
@@ -152,6 +167,8 @@ services:
     build:
       context: ../../services/control-plane
       dockerfile: Dockerfile
+      args:
+        XRAY_VERSION: ${XRAY_VERSION}
     restart: unless-stopped
     env_file:
       - ../env/control-plane.env
@@ -173,6 +190,7 @@ services:
       TELEGRAM_ADMIN_IDS: ${TELEGRAM_ADMIN_IDS}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL}
+      CONTROL_PLANE_ADMIN_TOKEN: ${CONTROL_PLANE_ADMIN_TOKEN}
       PUBLIC_HOST: ${PUBLIC_HOST}
       XRAY_PORT: ${XRAY_PORT}
       XRAY_FLOW: xtls-rprx-vision
@@ -207,15 +225,16 @@ services:
       - ../../infra/xray/generated:/srv/xray/generated
       - ../../infra/mtg/mtg.toml.tmpl:/srv/mtg/templates/mtg.toml.tmpl:ro
       - ../../infra/mtg/generated:/srv/mtg/generated
-      - ../../deploy/secrets:/srv/secrets
+      - ../../deploy/secrets/reality:/srv/secrets/reality
+      - ../../deploy/secrets/mtproto:/srv/secrets/mtproto:ro
       - ../../services/control-plane/migrations:/srv/control-plane/migrations:ro
       - control-plane-data:/var/lib/control-plane
     ports:
       - "127.0.0.1:${CONTROL_PLANE_PORT}:8080/tcp"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/readyz >/dev/null"]
+      test: ["CMD-SHELL", "curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:8080/readyz >/dev/null"]
       interval: 10s
-      timeout: 5s
+      timeout: 4s
       retries: 6
       start_period: 15s
     networks:

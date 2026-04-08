@@ -2,10 +2,12 @@ package httpapi
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"control-plane/internal/domain"
@@ -28,7 +30,7 @@ type RouterService interface {
 	Ready(context.Context) domain.ReadinessReport
 }
 
-func NewRouter(app RouterService, logger *slog.Logger) http.Handler {
+func NewRouter(app RouterService, logger *slog.Logger, adminToken string) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -49,6 +51,8 @@ func NewRouter(app RouterService, logger *slog.Logger) http.Handler {
 	})
 
 	r.Route("/api/admin", func(r chi.Router) {
+		r.Use(adminAuthMiddleware(adminToken))
+
 		r.Get("/users", func(w http.ResponseWriter, r *http.Request) {
 			users, err := app.ListUsers(r.Context(), actorFromRequest(r))
 			if err != nil {
@@ -138,6 +142,46 @@ func NewRouter(app RouterService, logger *slog.Logger) http.Handler {
 	})
 
 	return r
+}
+
+func adminAuthMiddleware(expectedToken string) func(http.Handler) http.Handler {
+	expectedToken = strings.TrimSpace(expectedToken)
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if expectedToken == "" {
+				http.NotFound(w, r)
+				return
+			}
+
+			token, ok := bearerToken(r.Header.Get("Authorization"))
+			if !ok || subtle.ConstantTimeCompare([]byte(token), []byte(expectedToken)) != 1 {
+				w.Header().Set("WWW-Authenticate", "Bearer")
+				writeJSON(w, http.StatusForbidden, map[string]string{"error": "доступ запрещён"})
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func bearerToken(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", false
+	}
+
+	scheme, token, ok := strings.Cut(raw, " ")
+	if !ok || !strings.EqualFold(strings.TrimSpace(scheme), "Bearer") {
+		return "", false
+	}
+
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", false
+	}
+	return token, true
 }
 
 func actorFromRequest(r *http.Request) domain.Actor {

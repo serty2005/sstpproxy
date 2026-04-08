@@ -1,4 +1,7 @@
-FROM tiomny/docker-sstp-client:latest
+ARG SSTP_IMAGE_TAG=latest
+ARG SSTP_IMAGE_DIGEST=sha256:4afc497feee97bbcc9f2fe80f86bc086e8d9d9ad4757071928fe6ec8cdbd7fd8
+
+FROM tiomny/docker-sstp-client:${SSTP_IMAGE_TAG}@${SSTP_IMAGE_DIGEST}
 
 ENV DEBIAN_FRONTEND=noninteractive
 

@@ -85,7 +85,7 @@ type HealthService struct {
 	cfg    config.Config
 	store  domain.Store
 	docker *dockerctl.Client
-	keys   *RealityKeyService
+	xray   *xray.Manager
 }
 
 type Facade struct {
@@ -157,7 +157,7 @@ func New(store domain.Store, cfg config.Config, xrayManager *xray.Manager, mtgMa
 			cfg:    cfg,
 			store:  store,
 			docker: docker,
-			keys:   keys,
+			xray:   xrayManager,
 		},
 	}
 }
@@ -311,36 +311,83 @@ func (s *HealthService) Health(ctx context.Context) domain.HealthReport {
 
 func (s *HealthService) Ready(ctx context.Context) domain.ReadinessReport {
 	report := domain.ReadinessReport{
-		Status:        "ok",
-		Time:          time.Now().UTC(),
-		Storage:       "ok",
-		Docker:        "ok",
-		ActiveKeyset:  "ok",
-		XrayConfig:    "ok",
-		MTProtoConfig: "ok",
+		Status:               "ok",
+		Time:                 time.Now().UTC(),
+		Storage:              "ok",
+		Docker:               "ok",
+		ActiveKeyset:         "ok",
+		XrayConfig:           "ok",
+		XrayConfigValidation: "ok",
+		MTProtoConfig:        "ok",
 	}
 
-	if err := s.store.Ping(ctx); err != nil {
-		report.Status = "degraded"
-		report.Storage = err.Error()
+	s.checkReadiness(ctx, &report, &report.Storage, 2*time.Second, func(ctx context.Context) error {
+		return s.store.Ping(ctx)
+	})
+	s.checkReadiness(ctx, &report, &report.Docker, 3*time.Second, func(ctx context.Context) error {
+		return s.docker.Ping(ctx)
+	})
+	s.checkReadiness(ctx, &report, &report.ActiveKeyset, 3*time.Second, func(ctx context.Context) error {
+		keyset, err := s.store.RealityKeysets().GetActive(ctx)
+		if err != nil {
+			return err
+		}
+		if err := ensureRegularFile(keyset.PrivateKeySecretPath); err != nil {
+			return fmt.Errorf("private key keyset %q недоступен: %w", keyset.Name, err)
+		}
+		report.ActiveKeyset = "ok:" + keyset.Name
+		return nil
+	})
+
+	xrayConfigReady := false
+	s.checkReadiness(ctx, &report, &report.XrayConfig, 2*time.Second, func(context.Context) error {
+		if err := ensureRegularFile(s.cfg.XrayActiveConfigPath); err != nil {
+			return err
+		}
+		report.XrayConfig = "ok:" + s.cfg.XrayActiveConfigPath
+		xrayConfigReady = true
+		return nil
+	})
+	if xrayConfigReady {
+		s.checkReadiness(ctx, &report, &report.XrayConfigValidation, 5*time.Second, func(ctx context.Context) error {
+			return s.xray.ValidateConfig(ctx, s.cfg.XrayActiveConfigPath)
+		})
+	} else {
+		report.XrayConfigValidation = "пропущено: отсутствует активный конфиг Xray"
 	}
-	if err := s.docker.Ping(ctx); err != nil {
-		report.Status = "degraded"
-		report.Docker = err.Error()
-	}
-	if _, err := s.keys.EnsureActive(ctx); err != nil {
-		report.Status = "degraded"
-		report.ActiveKeyset = err.Error()
-	}
-	if _, err := os.Stat(s.cfg.XrayActiveConfigPath); err != nil {
-		report.Status = "degraded"
-		report.XrayConfig = err.Error()
-	}
-	if _, err := os.Stat(s.cfg.MTProtoActiveConfig); err != nil {
-		report.Status = "degraded"
-		report.MTProtoConfig = err.Error()
-	}
+
+	s.checkReadiness(ctx, &report, &report.MTProtoConfig, 2*time.Second, func(context.Context) error {
+		if err := ensureRegularFile(s.cfg.MTProtoActiveConfig); err != nil {
+			return err
+		}
+		report.MTProtoConfig = "ok:" + s.cfg.MTProtoActiveConfig
+		return nil
+	})
 	return report
+}
+
+func (s *HealthService) checkReadiness(parent context.Context, report *domain.ReadinessReport, target *string, timeout time.Duration, fn func(context.Context) error) {
+	ctx, cancel := context.WithTimeout(parent, timeout)
+	defer cancel()
+
+	if err := fn(ctx); err != nil {
+		report.Status = "degraded"
+		*target = err.Error()
+	}
+}
+
+func ensureRegularFile(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%s не является обычным файлом", path)
+	}
+	if info.Size() == 0 {
+		return fmt.Errorf("%s пуст", path)
+	}
+	return nil
 }
 
 func systemActor(id string) domain.Actor {

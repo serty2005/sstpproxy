@@ -32,6 +32,12 @@ func main() {
 	}
 	defer runtime.Close()
 
+	if cfg.ControlPlaneAdminToken == "" {
+		log.Warn("admin API отключён", "reason", "пустой CONTROL_PLANE_ADMIN_TOKEN")
+	} else {
+		log.Info("admin API защищён Bearer token")
+	}
+
 	server := &http.Server{
 		Addr:              cfg.HTTPListenAddr,
 		Handler:           runtime.HTTP,

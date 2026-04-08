@@ -10,16 +10,15 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o
 
 FROM debian:bookworm-slim
 
-ARG XRAY_DOWNLOAD_URL=https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
+ARG XRAY_VERSION=v26.3.27
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
-    wget \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL "${XRAY_DOWNLOAD_URL}" -o /tmp/xray.zip \
+RUN curl -fsSL "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-64.zip" -o /tmp/xray.zip \
     && unzip /tmp/xray.zip xray -d /usr/local/bin \
     && chmod +x /usr/local/bin/xray \
     && rm -f /tmp/xray.zip
