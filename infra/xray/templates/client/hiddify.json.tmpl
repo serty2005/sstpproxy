@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "remarks": "{{ .Label }}",
+  "dns": {
+    "servers": ["1.1.1.1", "8.8.8.8"]
+  },
+  "outbounds": [
+    {
+      "type": "vless",
+      "tag": "proxy",
+      "server": "{{ .Host }}",
+      "server_port": {{ .Port }},
+      "uuid": "{{ .UUID }}",
+      "flow": "{{ .Flow }}",
+      "packet_encoding": "xudp",
+      "tls": {
+        "enabled": true,
+        "server_name": "{{ .ServerName }}",
+        "utls": {
+          "enabled": true,
+          "fingerprint": "{{ .Fingerprint }}"
+        },
+        "reality": {
+          "enabled": true,
+          "public_key": "{{ .PublicKey }}",
+          "short_id": "{{ .ShortID }}"
+        }
+      },
+      "transport": {
+        "type": "tcp"
+      }
+    }
+  ],
+  "share_link": "{{ .URI }}"
+}

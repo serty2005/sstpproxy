@@ -1,0 +1,239 @@
+name: sstpproxy
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    networks:
+      - backend
+    security_opt:
+      - no-new-privileges:true
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      POST: 1
+      PING: 1
+      VERSION: 1
+      INFO: 0
+      EVENTS: 0
+      IMAGES: 0
+      NETWORKS: 0
+      NODES: 0
+      SERVICES: 0
+      TASKS: 0
+      VOLUMES: 0
+      BUILD: 0
+      AUTH: 0
+      DISTRIBUTION: 0
+      EXEC: 0
+      PLUGINS: 0
+      SECRETS: 0
+      SESSION: 0
+      SWARM: 0
+      SYSTEM: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - backend
+    read_only: true
+    tmpfs:
+      - /run:rw,noexec,nosuid,size=8m
+      - /tmp:rw,noexec,nosuid,size=8m
+    security_opt:
+      - no-new-privileges:true
+
+  sstp-egress:
+    build:
+      context: ../../infra/sstp-egress
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/ppp:/dev/ppp
+    security_opt:
+      - seccomp:unconfined
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv4.conf.all.rp_filter: "0"
+      net.ipv4.conf.default.rp_filter: "0"
+      net.ipv6.conf.all.disable_ipv6: "1"
+      net.ipv6.conf.default.disable_ipv6: "1"
+    environment:
+      REMOTEHOST: ${SSTP_REMOTEHOST}
+      USER: ${SSTP_USERNAME}
+      PASSWORD: ${SSTP_PASSWORD}
+      XRAY_PORT: ${XRAY_PORT}
+      MTG_PORT: ${MTG_PORT}
+    ports:
+      - "${XRAY_PORT}:${XRAY_PORT}/tcp"
+      - "${MTG_PORT}:${MTG_PORT}/tcp"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/local/bin/sstp-healthcheck"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    stop_grace_period: 20s
+    networks:
+      - edge
+
+  xray-edge:
+    image: ghcr.io/xtls/xray-core:${XRAY_IMAGE_TAG}
+    restart: unless-stopped
+    network_mode: "service:sstp-egress"
+    depends_on:
+      control-plane:
+        condition: service_healthy
+      sstp-egress:
+        condition: service_started
+    command: ["run", "-c", "/etc/xray/config.json"]
+    volumes:
+      - ../../infra/xray/generated:/etc/xray:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "xray run -test -config /etc/xray/config.json >/dev/null 2>&1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  mtg-edge:
+    image: nineseconds/mtg:${MTG_IMAGE_TAG}
+    restart: unless-stopped
+    network_mode: "service:sstp-egress"
+    depends_on:
+      control-plane:
+        condition: service_healthy
+      sstp-egress:
+        condition: service_started
+    command: ["run", "/etc/mtg/mtg.toml"]
+    volumes:
+      - ../../infra/mtg/generated:/etc/mtg:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "mtg access /etc/mtg/mtg.toml >/dev/null 2>&1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  control-plane:
+    build:
+      context: ../../services/control-plane
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../env/control-plane.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      docker-socket-proxy:
+        condition: service_started
+      sstp-egress:
+        condition: service_started
+    environment:
+      APP_ENV: ${APP_ENV}
+      LOG_LEVEL: ${LOG_LEVEL}
+      HTTP_LISTEN_ADDR: :8080
+      STORAGE_DRIVER: postgres
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      SQLITE_PATH: /var/lib/control-plane/control-plane.db
+      MIGRATIONS_DIR: /srv/control-plane/migrations
+      TELEGRAM_ADMIN_IDS: ${TELEGRAM_ADMIN_IDS}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL}
+      PUBLIC_HOST: ${PUBLIC_HOST}
+      XRAY_PORT: ${XRAY_PORT}
+      XRAY_FLOW: xtls-rprx-vision
+      XRAY_CLIENT_FP: chrome
+      XRAY_REALITY_DEST: ${XRAY_REALITY_DEST}
+      XRAY_REALITY_SERVER_NAMES: ${XRAY_REALITY_SERVER_NAMES}
+      XRAY_SERVER_TEMPLATE: /srv/xray/templates/config.json.tmpl
+      XRAY_NEKORAY_TEMPLATE: /srv/xray/templates/client/nekoray.json.tmpl
+      XRAY_HIDDIFY_TEMPLATE: /srv/xray/templates/client/hiddify.json.tmpl
+      XRAY_V2RAYN_TEMPLATE: /srv/xray/templates/client/v2rayn.json.tmpl
+      XRAY_ACTIVE_CONFIG_PATH: /srv/xray/generated/config.json
+      XRAY_ARCHIVE_DIR: /srv/xray/generated/history
+      XRAY_BINARY_PATH: /usr/local/bin/xray
+      XRAY_CONTAINER_NAME: xray-edge
+      REALITY_KEYSET_NAME: primary
+      REALITY_SECRET_DIR: /srv/secrets/reality
+      REALITY_PRIVATE_KEY_FILE_NAME: active.key
+      REALITY_SHORT_ID_POOL_SIZE: 64
+      REALITY_SHORT_ID_BYTES: 8
+      MTPROTO_TEMPLATE: /srv/mtg/templates/mtg.toml.tmpl
+      MTPROTO_ACTIVE_CONFIG_PATH: /srv/mtg/generated/mtg.toml
+      MTPROTO_ARCHIVE_DIR: /srv/mtg/generated/history
+      MTPROTO_PORT: ${MTG_PORT}
+      MTPROTO_PUBLIC_HOST: ${PUBLIC_HOST}
+      MTPROTO_SECRET_FILE: /srv/secrets/mtproto/secret
+      MTPROTO_SECRET_NAME: primary
+      MTPROTO_CONTAINER_NAME: mtg-edge
+      DOCKER_API_BASE_URL: http://docker-socket-proxy:2375
+      DOCKER_RESTART_TIMEOUT_SECONDS: 20
+    volumes:
+      - ../../infra/xray/templates:/srv/xray/templates:ro
+      - ../../infra/xray/generated:/srv/xray/generated
+      - ../../infra/mtg/mtg.toml.tmpl:/srv/mtg/templates/mtg.toml.tmpl:ro
+      - ../../infra/mtg/generated:/srv/mtg/generated
+      - ../../deploy/secrets:/srv/secrets
+      - ../../services/control-plane/migrations:/srv/control-plane/migrations:ro
+      - control-plane-data:/var/lib/control-plane
+    ports:
+      - "127.0.0.1:${CONTROL_PLANE_PORT}:8080/tcp"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/readyz >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    networks:
+      - backend
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /run:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  backend:
+    internal: true
+  edge:
+
+volumes:
+  postgres-data:
+  control-plane-data:

@@ -1,0 +1,72 @@
+{
+  "log": {
+    "loglevel": "{{ .LogLevel }}"
+  },
+  "policy": {
+    "levels": {
+      "0": {
+        "handshake": 4,
+        "connIdle": 300,
+        "uplinkOnly": 2,
+        "downlinkOnly": 5
+      }
+    }
+  },
+  "inbounds": [
+    {
+      "tag": "vless-reality-in",
+      "listen": "0.0.0.0",
+      "port": {{ .Port }},
+      "protocol": "vless",
+      "settings": {
+        "clients": {{ .ClientsJSON }},
+        "decryption": "none"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "dest": "{{ .RealityDest }}",
+          "xver": 0,
+          "serverNames": {{ .ServerNamesJSON }},
+          "privateKey": "{{ .RealityPrivateKey }}",
+          "shortIds": {{ .ShortIDsJSON }}
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "vpn-out",
+      "protocol": "freedom",
+      "settings": {
+        "domainStrategy": "UseIPv4"
+      },
+      "streamSettings": {
+        "sockopt": {
+          "interface": "ppp0"
+        }
+      }
+    },
+    {
+      "tag": "blocked",
+      "protocol": "blackhole",
+      "settings": {}
+    }
+  ],
+  "routing": {
+    "domainStrategy": "AsIs",
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": ["vless-reality-in"],
+        "outboundTag": "vpn-out"
+      }
+    ]
+  }
+}

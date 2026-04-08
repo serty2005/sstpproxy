@@ -1,0 +1,4 @@
+name: sstpproxy
+
+# Основной production compose находится в deploy/compose/docker-compose.yml.
+services: {}

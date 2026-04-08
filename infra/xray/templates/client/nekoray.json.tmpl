@@ -1,0 +1,28 @@
+{
+  "type": "profile",
+  "name": "{{ .Label }}",
+  "config_version": 1,
+  "target": "xray",
+  "config": {
+    "v": "2",
+    "ps": "{{ .Label }}",
+    "add": "{{ .Host }}",
+    "port": "{{ .Port }}",
+    "id": "{{ .UUID }}",
+    "aid": "0",
+    "scy": "none",
+    "net": "tcp",
+    "type": "none",
+    "host": "",
+    "path": "",
+    "tls": "reality",
+    "sni": "{{ .ServerName }}",
+    "fp": "{{ .Fingerprint }}",
+    "pbk": "{{ .PublicKey }}",
+    "sid": "{{ .ShortID }}",
+    "flow": "{{ .Flow }}",
+    "alpn": "",
+    "allowInsecure": false
+  },
+  "share_link": "{{ .URI }}"
+}
