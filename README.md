@@ -15,7 +15,8 @@ Production-ready каркас сервиса доступа через SSTP-egre
 - `sstp-egress` остаётся владельцем `ppp0`, policy routing и опубликованных портов.
 - `xray-edge` и `mtg-edge` вынесены в отдельные контейнеры и используют `network_mode: "service:sstp-egress"`.
 - `control-plane` работает как отдельный Go-сервис с PostgreSQL, миграциями, шаблонами, Telegram-ботом, audit trail и безопасным apply Xray-конфига.
-- приватный REALITY key хранится в docker volume `reality-secrets`, а в PostgreSQL лежит только metadata и публичный ключ.
+- шаблоны Xray, MTProto и миграции упакованы в `control-plane` образ, поэтому production-compose не зависит от структуры репозитория на хосте.
+- приватный REALITY key хранится в docker volume `reality-secrets`, а MTProto secret засеивается init-контейнером в volume `mtproto-secrets`.
 - shortId управляются отдельным пулом и назначаются пользователям из control-plane.
 
 Локальная сборка и публикация образов:
@@ -35,8 +36,8 @@ docker compose push
 
 Быстрый запуск production-стека:
 
-1. Скопируйте [deploy/compose/.env.example](/c:/safe/repos/sstpproxy/deploy/compose/.env.example) в `deploy/compose/.env` и заполните runtime-переменные, включая имена опубликованных образов.
-2. Подготовьте каталог `deploy/secrets/mtproto` и положите в `deploy/secrets/mtproto/secret` действительный MTProto secret.
+1. Скопируйте [deploy/compose/.env.example](/c:/safe/repos/sstpproxy/deploy/compose/.env.example) в `deploy/compose/.env` и заполните runtime-переменные, включая имена опубликованных образов, `MTPROTO_SECRET_VALUE`, `XRAY_VERSION` и `XRAY_IMAGE_TAG`.
+2. Перенесите на production-хост только `docker-compose.yml`, `.env` и при необходимости служебные скрипты из `deploy/compose`.
 3. Подтяните образы и запустите стек:
 
 ```bash
@@ -51,6 +52,11 @@ curl http://127.0.0.1:8080/readyz
 ```
 
 5. После старта добавьте пользователя через Telegram-бота или внутренний admin API и выполните `/xray_apply`, если меняли состав пользователей вручную.
+
+Практическая оговорка по Xray:
+
+- `XRAY_VERSION` используется для скачивания бинаря Xray в образ `control-plane` и должен быть с префиксом `v`, например `v26.3.27`.
+- `XRAY_IMAGE_TAG` используется для контейнера `ghcr.io/xtls/xray-core` и должен быть без префикса `v`, например `26.3.27`.
 
 Публикуемые порты production-стека:
 

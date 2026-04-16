@@ -1,0 +1,6 @@
+.git
+.codex
+.env
+deploy/compose/.env
+deploy/secrets
+deploy/data

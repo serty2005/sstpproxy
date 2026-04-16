@@ -23,6 +23,7 @@ Control-plane разбит на следующие слои:
 
 - На сервере держится один активный REALITY keyset.
 - `privateKey` хранится только в docker volume `reality-secrets`, который монтируется в `control-plane` как `/srv/secrets/reality`.
+- MTProto secret хранится в docker volume `mtproto-secrets`, который заполняет `control-plane-init` из `MTPROTO_SECRET_VALUE`.
 - `publicKey` и путь до secret file хранятся в таблице `reality_keysets`.
 - shortId живут в отдельной таблице `reality_short_ids`.
 - При создании пользователя shortId выделяется из активного пула, а при revoke возвращается обратно в пул.

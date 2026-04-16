@@ -3,7 +3,7 @@
 ## Что уже сделано
 
 - REALITY `privateKey` не хранится в PostgreSQL.
-- MTProto secret не хранится в git и читается из secret file.
+- MTProto secret не хранится в git и записывается init-контейнером в volume `mtproto-secrets`.
 - `deploy/secrets` закрыт `.gitignore`, а REALITY private key вынесен в docker volume `reality-secrets`.
 - `control-plane`, `xray-edge` и `mtg-edge` используют `read_only` root filesystem там, где это возможно.
 - Для `control-plane`, `xray-edge` и `mtg-edge` включён `no-new-privileges`.
@@ -15,10 +15,10 @@
 
 ## Что нужно помнить в эксплуатации
 
-- следите, чтобы `deploy/secrets/mtproto` и docker volume `reality-secrets` были доступны только доверенным администраторам;
+- следите, чтобы docker volume `mtproto-secrets` и `reality-secrets` были доступны только доверенным администраторам;
 - после ротации REALITY keyset нужно перевыпустить пользовательские профили;
 - логи control-plane не должны уходить в публичные системы без фильтрации, если в будущем туда добавятся дополнительные поля;
-- если меняется MTProto secret file, control-plane на следующем bootstrap или следующем рендере зафиксирует новую metadata-запись в БД.
+- если меняется `MTPROTO_SECRET_VALUE`, control-plane на следующем bootstrap или следующем рендере зафиксирует новую metadata-запись в БД.
 
 ## Ротация секретов
 
@@ -30,6 +30,6 @@ REALITY:
 
 MTProto:
 
-1. Обновить содержимое `deploy/secrets/mtproto/secret`.
+1. Обновить `MTPROTO_SECRET_VALUE` в `.env` и повторно выполнить `docker compose up -d`.
 2. Перезапустить `control-plane` или выполнить операцию, которая заново отрендерит MTProto config.
 3. Раздать новую `tg://proxy?...` ссылку пользователям.

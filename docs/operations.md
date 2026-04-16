@@ -3,9 +3,11 @@
 ## Подготовка
 
 1. Скопируйте `deploy/compose/.env.example` в `deploy/compose/.env`.
-2. Создайте `deploy/secrets/mtproto/secret` и положите туда действительный MTProto secret.
-3. Укажите в `deploy/compose/.env` имена опубликованных образов для `SSTP_EGRESS_IMAGE`, `TELEGRAM_PROXY_IMAGE` и `CONTROL_PLANE_IMAGE`.
-4. Первый private key для REALITY появится автоматически в docker volume `reality-secrets` при bootstrap.
+2. Укажите в `deploy/compose/.env` имена опубликованных образов для `SSTP_EGRESS_IMAGE`, `TELEGRAM_PROXY_IMAGE` и `CONTROL_PLANE_IMAGE`.
+3. Заполните `MTPROTO_SECRET_VALUE` реальным MTProto secret.
+4. Укажите `XRAY_VERSION` в формате GitHub release tag, например `v26.3.27`, и `XRAY_IMAGE_TAG` в формате container tag, например `26.3.27`.
+5. При первом bootstrap `control-plane-init` сам создаст docker volume `reality-secrets`, `mtproto-secrets`, `xray-generated` и `mtg-generated`.
+6. На production-хосте не нужна структура каталогов репозитория: шаблоны и миграции уже лежат внутри `control-plane` образа.
 
 ## Запуск стека
 
@@ -78,7 +80,7 @@ curl -X POST http://127.0.0.1:8080/api/admin/xray/keyset/rotate -H "X-Admin-Acto
 
 ## Полезные данные и секреты
 
-- `deploy/secrets/mtproto/secret` — MTProto secret file на хосте.
 - volume `reality-secrets` — REALITY private key files.
+- volume `mtproto-secrets` — MTProto secret file, созданный из `MTPROTO_SECRET_VALUE`.
 - volume `xray-generated` — активный и архивные Xray config.
 - volume `mtg-generated` — активный и архивные MTProto config.

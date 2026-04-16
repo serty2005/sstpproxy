@@ -1,11 +1,11 @@
 FROM golang:1.25-bookworm AS build
 
-WORKDIR /src
+WORKDIR /src/services/control-plane
 
-COPY go.mod go.sum* ./
+COPY services/control-plane/go.mod services/control-plane/go.sum* ./
 RUN go mod download
 
-COPY . .
+COPY services/control-plane/ ./
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o /out/control-plane ./cmd/control-plane
 
 FROM debian:bookworm-slim
@@ -29,7 +29,9 @@ RUN groupadd --system --gid 10001 controlplane \
 WORKDIR /srv/control-plane
 
 COPY --from=build /out/control-plane /usr/local/bin/control-plane
-COPY migrations /srv/control-plane/migrations
+COPY services/control-plane/migrations /srv/control-plane/migrations
+COPY infra/xray/templates /srv/xray/templates
+COPY infra/mtg/mtg.toml.tmpl /srv/mtg/templates/mtg.toml.tmpl
 
 USER 10001:10001
 

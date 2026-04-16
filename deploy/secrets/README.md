@@ -2,9 +2,8 @@
 
 В этот каталог не нужно коммитить реальные секреты.
 
-Ожидаемые пути для production-compose:
+Production-compose больше не использует файлы из этого каталога напрямую.
 
-- `deploy/secrets/mtproto/secret` — текущий MTProto secret. Его нужно создать заранее.
-- приватный REALITY key хранится не в репозитории, а в docker volume `reality-secrets`, который control-plane заполняет сам при первом bootstrap.
-
-Каталог `deploy/secrets/mtproto` смонтирован в `control-plane` как `/srv/secrets/mtproto`.
+- приватный REALITY key хранится в docker volume `reality-secrets`;
+- MTProto secret хранится в docker volume `mtproto-secrets` и создаётся из переменной `MTPROTO_SECRET_VALUE`;
+- если нужен локальный резервный экспорт секретов, держите его вне репозитория.
