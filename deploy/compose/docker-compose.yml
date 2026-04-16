@@ -112,13 +112,17 @@ services:
     network_mode: "service:sstp-egress"
     depends_on:
       sstp-egress:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 3128"]
-      interval: 10s
-      timeout: 3s
+      test:
+        [
+          "CMD-SHELL",
+          "printf 'CONNECT api.telegram.org:443 HTTP/1.1\\r\\nHost: api.telegram.org:443\\r\\n\\r\\n' | nc -w 5 127.0.0.1 3128 | grep -q '200 Connection established'",
+        ]
+      interval: 30s
+      timeout: 8s
       retries: 6
-      start_period: 5s
+      start_period: 15s
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=8m
@@ -178,7 +182,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "mtg access /etc/mtg/mtg.toml >/dev/null 2>&1"]
+      test: ["CMD", "/mtg", "access", "/etc/mtg/mtg.toml"]
       interval: 20s
       timeout: 5s
       retries: 3

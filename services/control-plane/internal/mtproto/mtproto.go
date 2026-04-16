@@ -1,6 +1,7 @@
 package mtproto
 
 import (
+	"encoding/base64"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -41,9 +42,13 @@ func (m *Manager) LoadSecret() (string, string, error) {
 }
 
 func (m *Manager) Link(secret string) string {
+	encodedSecret := secret
+	if raw, err := hex.DecodeString(secret); err == nil {
+		encodedSecret = base64.RawURLEncoding.EncodeToString(raw)
+	}
 	return "tg://proxy?server=" + url.QueryEscape(m.cfg.MTProtoHost()) +
 		"&port=" + url.QueryEscape(strconv.Itoa(m.cfg.MTProtoPort)) +
-		"&secret=" + url.QueryEscape(secret)
+		"&secret=" + url.QueryEscape(encodedSecret)
 }
 
 func (m *Manager) RenderConfig(secret string) (string, error) {
