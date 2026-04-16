@@ -3,6 +3,7 @@ package config
 import (
 	"cmp"
 	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -22,6 +23,7 @@ type Config struct {
 	TelegramAdminIDs       map[int64]struct{}
 	TelegramBotToken       string
 	TelegramAPIBaseURL     string
+	TelegramProxyURL       string
 
 	PublicHost string
 
@@ -70,6 +72,7 @@ func Load() (Config, error) {
 		MigrationsDir:          getEnv("MIGRATIONS_DIR", "./migrations"),
 		TelegramBotToken:       os.Getenv("TELEGRAM_BOT_TOKEN"),
 		TelegramAPIBaseURL:     strings.TrimRight(getEnv("TELEGRAM_API_BASE_URL", "https://api.telegram.org"), "/"),
+		TelegramProxyURL:       strings.TrimSpace(os.Getenv("TELEGRAM_PROXY_URL")),
 		PublicHost:             strings.TrimSpace(os.Getenv("PUBLIC_HOST")),
 		XrayFlow:               getEnv("XRAY_FLOW", "xtls-rprx-vision"),
 		XrayClientFingerprint:  getEnv("XRAY_CLIENT_FP", "chrome"),
@@ -142,6 +145,12 @@ func Load() (Config, error) {
 	}
 	if cfg.PublicHost == "" {
 		return Config{}, errors.New("PUBLIC_HOST обязателен")
+	}
+	if cfg.TelegramProxyURL != "" {
+		proxyURL, err := url.Parse(cfg.TelegramProxyURL)
+		if err != nil || proxyURL.Scheme == "" || proxyURL.Host == "" {
+			return Config{}, errors.New("TELEGRAM_PROXY_URL должен быть абсолютным URL, например http://telegram-proxy:3128")
+		}
 	}
 	if cfg.XrayRealityDest == "" {
 		return Config{}, errors.New("XRAY_REALITY_DEST обязателен")

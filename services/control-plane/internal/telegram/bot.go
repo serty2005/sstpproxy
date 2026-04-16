@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -55,13 +56,25 @@ type message struct {
 }
 
 func NewBot(cfg config.Config, service Service, logger *slog.Logger) *Bot {
+	httpClient := &http.Client{
+		Timeout: 40 * time.Second,
+	}
+	if cfg.TelegramProxyURL != "" {
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		proxyURL, err := url.Parse(cfg.TelegramProxyURL)
+		if err != nil {
+			logger.Error("некорректный TELEGRAM_PROXY_URL, использую прямое подключение", "error", err, "url", cfg.TelegramProxyURL)
+		} else {
+			transport.Proxy = http.ProxyURL(proxyURL)
+			httpClient.Transport = transport
+		}
+	}
+
 	return &Bot{
-		cfg:     cfg,
-		service: service,
-		logger:  logger,
-		httpClient: &http.Client{
-			Timeout: 40 * time.Second,
-		},
+		cfg:        cfg,
+		service:    service,
+		logger:     logger,
+		httpClient: httpClient,
 	}
 }
 

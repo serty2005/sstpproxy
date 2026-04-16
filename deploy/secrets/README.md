@@ -4,7 +4,7 @@
 
 Ожидаемые пути для production-compose:
 
-- `deploy/secrets/reality/active.key` — приватный REALITY key, который control-plane создаёт сам при первом bootstrap.
 - `deploy/secrets/mtproto/secret` — текущий MTProto secret. Его нужно создать заранее.
+- приватный REALITY key хранится не в репозитории, а в docker volume `reality-secrets`, который control-plane заполняет сам при первом bootstrap.
 
-Каталог смонтирован в `control-plane` как `/srv/secrets`.
+Каталог `deploy/secrets/mtproto` смонтирован в `control-plane` как `/srv/secrets/mtproto`.

@@ -1,4 +1,25 @@
-name: sstpproxy
+name: sstpproxy-build
 
-# Основной production compose находится в deploy/compose/docker-compose.yml.
-services: {}
+services:
+  sstp-egress:
+    image: ${SSTP_EGRESS_IMAGE}
+    build:
+      context: ./infra/sstp-egress
+      dockerfile: Dockerfile
+      args:
+        SSTP_IMAGE_TAG: ${SSTP_IMAGE_TAG}
+        SSTP_IMAGE_DIGEST: ${SSTP_IMAGE_DIGEST}
+
+  telegram-proxy:
+    image: ${TELEGRAM_PROXY_IMAGE}
+    build:
+      context: ./infra/telegram-proxy
+      dockerfile: Dockerfile
+
+  control-plane:
+    image: ${CONTROL_PLANE_IMAGE}
+    build:
+      context: ./services/control-plane
+      dockerfile: Dockerfile
+      args:
+        XRAY_VERSION: ${XRAY_VERSION}

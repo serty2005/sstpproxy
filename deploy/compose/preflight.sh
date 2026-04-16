@@ -23,7 +23,6 @@ fi
 "${PYTHON_BIN}" - "${ENV_FILE}" "${REPO_ROOT}" <<'PY'
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
@@ -56,11 +55,12 @@ def warn(message: str) -> None:
 env = parse_env(env_path)
 
 required_vars = [
+    "SSTP_EGRESS_IMAGE",
+    "TELEGRAM_PROXY_IMAGE",
+    "CONTROL_PLANE_IMAGE",
     "SSTP_REMOTEHOST",
     "SSTP_USERNAME",
     "SSTP_PASSWORD",
-    "SSTP_IMAGE_TAG",
-    "SSTP_IMAGE_DIGEST",
     "PUBLIC_HOST",
     "XRAY_PORT",
     "MTG_PORT",
@@ -86,9 +86,6 @@ for key in ("XRAY_PORT", "MTG_PORT", "CONTROL_PLANE_PORT"):
     if not 1 <= port <= 65535:
         fail(f"{key} должен быть в диапазоне 1..65535")
 
-if not env["SSTP_IMAGE_DIGEST"].startswith("sha256:"):
-    fail("SSTP_IMAGE_DIGEST должен начинаться с sha256:")
-
 if not env["XRAY_VERSION"].startswith("v"):
     fail("XRAY_VERSION должен быть в формате release tag, например v26.3.27")
 
@@ -99,6 +96,11 @@ placeholder_like = ("replace", "changeme", "example.com", "example.org")
 for key in ("SSTP_REMOTEHOST", "SSTP_PASSWORD", "POSTGRES_PASSWORD"):
     value = env.get(key, "").lower()
     if any(marker in value for marker in placeholder_like):
+        fail(f"{key} всё ещё содержит шаблонное значение")
+
+for key in ("SSTP_EGRESS_IMAGE", "TELEGRAM_PROXY_IMAGE", "CONTROL_PLANE_IMAGE"):
+    value = env.get(key, "").lower()
+    if any(marker in value for marker in ("replace", "changeme", "your-namespace", "<", ">")):
         fail(f"{key} всё ещё содержит шаблонное значение")
 
 bot_token = env.get("TELEGRAM_BOT_TOKEN", "")
@@ -117,10 +119,8 @@ paths_must_exist = {
     "Xray client template hiddify": repo_root / "infra/xray/templates/client/hiddify.json.tmpl",
     "Xray client template v2rayn": repo_root / "infra/xray/templates/client/v2rayn.json.tmpl",
     "MTProto template": repo_root / "infra/mtg/mtg.toml.tmpl",
-    "Xray generated dir": repo_root / "infra/xray/generated",
-    "MTProto generated dir": repo_root / "infra/mtg/generated",
-    "Reality secrets dir": repo_root / "deploy/secrets/reality",
     "MTProto secrets dir": repo_root / "deploy/secrets/mtproto",
+    "Control-plane migrations dir": repo_root / "services/control-plane/migrations",
 }
 
 for label, path in paths_must_exist.items():
@@ -133,21 +133,7 @@ if not mtproto_secret.is_file():
 if mtproto_secret.stat().st_size == 0:
     fail(f"MTProto secret file пуст: {mtproto_secret}")
 
-reality_active_key = repo_root / "deploy/secrets/reality/active.key"
-if not reality_active_key.exists():
-    warn(f"файл {reality_active_key} пока отсутствует; при первом bootstrap control-plane может создать его сам")
-
-for writable_path in (
-    repo_root / "infra/xray/generated",
-    repo_root / "infra/mtg/generated",
-    repo_root / "deploy/secrets/reality",
-):
-    if not writable_path.is_dir():
-        fail(f"ожидалась директория: {writable_path}")
-
-digest_re = re.compile(r"^sha256:[0-9a-f]{64}$")
-if not digest_re.match(env["SSTP_IMAGE_DIGEST"]):
-    fail("SSTP_IMAGE_DIGEST должен содержать полный sha256 digest")
+warn("REALITY private key теперь хранится в docker volume reality-secrets и будет создан control-plane автоматически при первом bootstrap")
 
 print("Проверка env, шаблонов и secret-файлов прошла успешно.")
 PY

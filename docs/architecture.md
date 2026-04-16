@@ -22,7 +22,7 @@ Control-plane разбит на следующие слои:
 ## REALITY модель
 
 - На сервере держится один активный REALITY keyset.
-- `privateKey` хранится только в secret file внутри `deploy/secrets/reality`.
+- `privateKey` хранится только в docker volume `reality-secrets`, который монтируется в `control-plane` как `/srv/secrets/reality`.
 - `publicKey` и путь до secret file хранятся в таблице `reality_keysets`.
 - shortId живут в отдельной таблице `reality_short_ids`.
 - При создании пользователя shortId выделяется из активного пула, а при revoke возвращается обратно в пул.

@@ -18,10 +18,6 @@ services:
       start_period: 15s
     networks:
       - backend
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
 
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:0.3.0
@@ -62,12 +58,8 @@ services:
       - no-new-privileges:true
 
   sstp-egress:
-    build:
-      context: ../../infra/sstp-egress
-      dockerfile: Dockerfile
-      args:
-        SSTP_IMAGE_TAG: ${SSTP_IMAGE_TAG}
-        SSTP_IMAGE_DIGEST: ${SSTP_IMAGE_DIGEST}
+    image: ${SSTP_EGRESS_IMAGE}
+    pull_policy: always
     restart: unless-stopped
     cap_drop:
       - ALL
@@ -109,7 +101,27 @@ services:
       start_period: 45s
     stop_grace_period: 20s
     networks:
-      - edge
+      edge:
+      telegram-egress:
+        aliases:
+          - telegram-proxy
+
+  telegram-proxy:
+    image: ${TELEGRAM_PROXY_IMAGE}
+    pull_policy: always
+    restart: unless-stopped
+    network_mode: "service:sstp-egress"
+    depends_on:
+      sstp-egress:
+        condition: service_started
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=8m
+      - /run:rw,noexec,nosuid,size=8m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
   xray-edge:
     image: ghcr.io/xtls/xray-core:${XRAY_VERSION}
@@ -122,7 +134,7 @@ services:
         condition: service_started
     command: ["run", "-c", "/etc/xray/config.json"]
     volumes:
-      - ../../infra/xray/generated:/etc/xray:ro
+      - xray-generated:/etc/xray:ro
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=16m
@@ -148,7 +160,7 @@ services:
         condition: service_started
     command: ["run", "/etc/mtg/mtg.toml"]
     volumes:
-      - ../../infra/mtg/generated:/etc/mtg:ro
+      - mtg-generated:/etc/mtg:ro
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=16m
@@ -163,21 +175,40 @@ services:
       retries: 3
       start_period: 10s
 
+  control-plane-init:
+    image: ${CONTROL_PLANE_IMAGE}
+    pull_policy: always
+    user: "0:0"
+    command:
+      - sh
+      - -ec
+      - |
+        mkdir -p /srv/xray/generated/history
+        mkdir -p /srv/mtg/generated/history
+        mkdir -p /srv/secrets/reality
+        chown -R 10001:10001 /srv/xray/generated /srv/mtg/generated /srv/secrets/reality
+    restart: "no"
+    volumes:
+      - xray-generated:/srv/xray/generated
+      - mtg-generated:/srv/mtg/generated
+      - reality-secrets:/srv/secrets/reality
+
   control-plane:
-    build:
-      context: ../../services/control-plane
-      dockerfile: Dockerfile
-      args:
-        XRAY_VERSION: ${XRAY_VERSION}
+    image: ${CONTROL_PLANE_IMAGE}
+    pull_policy: always
     restart: unless-stopped
     env_file:
       - ../env/control-plane.env
     depends_on:
+      control-plane-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       docker-socket-proxy:
         condition: service_started
       sstp-egress:
+        condition: service_started
+      telegram-proxy:
         condition: service_started
     environment:
       APP_ENV: ${APP_ENV}
@@ -190,6 +221,7 @@ services:
       TELEGRAM_ADMIN_IDS: ${TELEGRAM_ADMIN_IDS}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL}
+      TELEGRAM_PROXY_URL: ${TELEGRAM_PROXY_URL:-http://telegram-proxy:3128}
       CONTROL_PLANE_ADMIN_TOKEN: ${CONTROL_PLANE_ADMIN_TOKEN}
       PUBLIC_HOST: ${PUBLIC_HOST}
       XRAY_PORT: ${XRAY_PORT}
@@ -222,10 +254,10 @@ services:
       DOCKER_RESTART_TIMEOUT_SECONDS: 20
     volumes:
       - ../../infra/xray/templates:/srv/xray/templates:ro
-      - ../../infra/xray/generated:/srv/xray/generated
+      - xray-generated:/srv/xray/generated
       - ../../infra/mtg/mtg.toml.tmpl:/srv/mtg/templates/mtg.toml.tmpl:ro
-      - ../../infra/mtg/generated:/srv/mtg/generated
-      - ../../deploy/secrets/reality:/srv/secrets/reality
+      - mtg-generated:/srv/mtg/generated
+      - reality-secrets:/srv/secrets/reality
       - ../../deploy/secrets/mtproto:/srv/secrets/mtproto:ro
       - ../../services/control-plane/migrations:/srv/control-plane/migrations:ro
       - control-plane-data:/var/lib/control-plane
@@ -239,6 +271,7 @@ services:
       start_period: 15s
     networks:
       - backend
+      - telegram-egress
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=32m
@@ -251,8 +284,13 @@ services:
 networks:
   backend:
     internal: true
+  telegram-egress:
+    internal: true
   edge:
 
 volumes:
   postgres-data:
   control-plane-data:
+  xray-generated:
+  mtg-generated:
+  reality-secrets:
