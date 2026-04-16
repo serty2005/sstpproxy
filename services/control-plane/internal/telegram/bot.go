@@ -133,14 +133,44 @@ func (b *Bot) handleMessage(ctx context.Context, msg message) {
 			_ = b.sendMessage(ctx, msg.Chat.ID, "Не удалось создать пользователя: "+err.Error())
 			return
 		}
-		_ = b.sendMessage(ctx, msg.Chat.ID, fmt.Sprintf("Пользователь создан.\nID: %s\nUUID: %s\nshortId: %s", user.ID, user.UUID, valueOrDash(user.RealityShortID)))
+		applied, err := b.service.ApplyXrayConfig(ctx, actor)
+		if err != nil {
+			_ = b.sendMessage(ctx, msg.Chat.ID, fmt.Sprintf(
+				"Пользователь создан, но Xray config не применён.\nID: %s\nUUID: %s\nshortId: %s\nОшибка: %s",
+				user.ID,
+				user.UUID,
+				valueOrDash(user.RealityShortID),
+				err.Error(),
+			))
+			return
+		}
+		_ = b.sendMessage(ctx, msg.Chat.ID, fmt.Sprintf(
+			"Пользователь создан.\nID: %s\nUUID: %s\nshortId: %s\nXray version: %d",
+			user.ID,
+			user.UUID,
+			valueOrDash(user.RealityShortID),
+			applied.Record.Version,
+		))
 	case "/user_revoke":
 		user, err := b.service.RevokeUser(ctx, actor, args)
 		if err != nil {
 			_ = b.sendMessage(ctx, msg.Chat.ID, "Не удалось деактивировать пользователя: "+err.Error())
 			return
 		}
-		_ = b.sendMessage(ctx, msg.Chat.ID, fmt.Sprintf("Пользователь деактивирован: %s", user.DisplayName))
+		applied, err := b.service.ApplyXrayConfig(ctx, actor)
+		if err != nil {
+			_ = b.sendMessage(ctx, msg.Chat.ID, fmt.Sprintf(
+				"Пользователь деактивирован, но Xray config не применён: %s\nОшибка: %s",
+				user.DisplayName,
+				err.Error(),
+			))
+			return
+		}
+		_ = b.sendMessage(ctx, msg.Chat.ID, fmt.Sprintf(
+			"Пользователь деактивирован: %s\nXray version: %d",
+			user.DisplayName,
+			applied.Record.Version,
+		))
 	case "/user_link":
 		link, err := b.service.UserLink(ctx, actor, args)
 		if err != nil {

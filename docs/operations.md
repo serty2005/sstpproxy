@@ -40,6 +40,8 @@ curl http://127.0.0.1:8080/readyz
 /user_profile <user_id_or_uuid> nekoray
 ```
 
+`/user_add` и `/user_revoke` в Telegram-боте автоматически применяют новый Xray config, поэтому отдельный `/xray_apply` после этих команд обычно не нужен.
+
 Через HTTP API:
 
 ```bash

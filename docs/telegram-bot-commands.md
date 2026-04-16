@@ -5,8 +5,8 @@
 - `/start` — краткая справка.
 - `/help` — список команд.
 - `/users` — список пользователей с ID, UUID, shortId и статусом.
-- `/user_add <display_name>` — создать пользователя.
-- `/user_revoke <user_id_or_uuid>` — деактивировать пользователя и освободить shortId.
+- `/user_add <display_name>` — создать пользователя и сразу применить новый Xray config.
+- `/user_revoke <user_id_or_uuid>` — деактивировать пользователя, освободить shortId и сразу применить новый Xray config.
 - `/user_link <user_id_or_uuid>` — вернуть VLESS URI.
 - `/user_profile <user_id_or_uuid> <nekoray|hiddify|v2rayn>` — вернуть JSON-профиль.
 - `/xray_render` — отрендерить Xray config и сохранить metadata.
@@ -17,5 +17,6 @@
 Ограничения:
 
 - доступ есть только у Telegram user ID из `TELEGRAM_ADMIN_IDS`;
+- после `/user_add` и `/user_revoke` бот сам вызывает `xray_apply`, поэтому выданные профили должны соответствовать активному серверному конфигу;
 - ошибки в чат отправляются в сжатом виде без stack trace;
 - каждое административное действие проходит через `audit_events`.

@@ -48,7 +48,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - backend
-    read_only: true
     tmpfs:
       - /run:rw,noexec,nosuid,size=8m
       - /tmp:rw,noexec,nosuid,size=8m
@@ -131,6 +130,7 @@ services:
 
   xray-edge:
     image: ghcr.io/xtls/xray-core:${XRAY_IMAGE_TAG}
+    container_name: xray-edge
     restart: unless-stopped
     user: "10001:10001"
     network_mode: "service:sstp-egress"
@@ -158,6 +158,7 @@ services:
 
   mtg-edge:
     image: nineseconds/mtg:${MTG_IMAGE_TAG}
+    container_name: mtg-edge
     restart: unless-stopped
     user: "10001:10001"
     network_mode: "service:sstp-egress"
