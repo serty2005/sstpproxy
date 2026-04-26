@@ -164,7 +164,7 @@ services:
     image: nineseconds/mtg:${MTG_IMAGE_TAG}
     container_name: mtg-edge
     restart: unless-stopped
-    user: "10001:10001"
+    user: "10002:10001"
     network_mode: "service:sstp-egress"
     depends_on:
       control-plane:
@@ -210,6 +210,7 @@ services:
         chmod 700 /srv/secrets/reality /srv/secrets/mtproto
         chmod 600 /srv/secrets/mtproto/secret
         chown -R 10001:10001 /srv/xray/generated /srv/mtg/generated /srv/secrets/reality /srv/secrets/mtproto
+        chmod 2775 /srv/mtg/generated /srv/mtg/generated/history
     restart: "no"
     volumes:
       - xray-generated:/srv/xray/generated

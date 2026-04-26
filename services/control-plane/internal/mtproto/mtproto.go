@@ -1,11 +1,12 @@
 package mtproto
 
 import (
-	"encoding/base64"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io/fs"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -52,12 +53,20 @@ func (m *Manager) Link(secret string) string {
 }
 
 func (m *Manager) RenderConfig(secret string) (string, error) {
+	publicIPv4 := ""
+	if ip := net.ParseIP(m.cfg.MTProtoHost()); ip != nil {
+		if ipv4 := ip.To4(); ipv4 != nil {
+			publicIPv4 = ipv4.String()
+		}
+	}
 	return m.templates.RenderFile(m.cfg.MTProtoTemplate, struct {
-		Secret string
-		Port   int
+		Secret     string
+		Port       int
+		PublicIPv4 string
 	}{
-		Secret: secret,
-		Port:   m.cfg.MTProtoPort,
+		Secret:     secret,
+		Port:       m.cfg.MTProtoPort,
+		PublicIPv4: publicIPv4,
 	})
 }
 

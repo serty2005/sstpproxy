@@ -41,8 +41,8 @@ docker compose push
 3. Подтяните образы и запустите стек:
 
 ```bash
-docker compose -f deploy/compose/docker-compose.yml --env-file deploy/compose/.env pull
-docker compose -f deploy/compose/docker-compose.yml --env-file deploy/compose/.env up -d
+docker compose -f /root/sstproxy/docker-compose.yml --env-file /root/sstproxy/.env pull
+docker compose -f /root/sstproxy/docker-compose.yml --env-file /root/sstproxy/.env up -d
 ```
 
 4. Проверьте готовность control-plane:

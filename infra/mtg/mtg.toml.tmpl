@@ -1,3 +1,6 @@
 secret = "{{ .Secret }}"
 bind-to = "0.0.0.0:{{ .Port }}"
 prefer-ip = "only-ipv4"
+{{- if .PublicIPv4 }}
+public-ipv4 = "{{ .PublicIPv4 }}"
+{{- end }}
