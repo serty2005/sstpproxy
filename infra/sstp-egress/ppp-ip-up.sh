@@ -12,6 +12,9 @@ if [[ "${IFNAME}" != "ppp0" ]]; then
   exit 0
 fi
 
+MTG_UID="${MTG_UID:-10002}"
+MTG_PORT="${MTG_PORT:-4430}"
+
 ip rule del pref 100 oif "${IFNAME}" table 100 2>/dev/null || true
 ip rule del pref 101 from "${LOCAL_IP}/32" table 100 2>/dev/null || true
 ip rule del pref 102 fwmark 0x1 table 100 2>/dev/null || true
@@ -23,8 +26,15 @@ ip rule add pref 100 oif "${IFNAME}" table 100
 ip rule add pref 101 from "${LOCAL_IP}/32" table 100
 ip rule add pref 102 fwmark 0x1 table 100
 
-iptables -t mangle -C OUTPUT -m owner --uid-owner 10002 -j MARK --set-mark 0x1 2>/dev/null \
-  || iptables -t mangle -A OUTPUT -m owner --uid-owner 10002 -j MARK --set-mark 0x1
+# MTProto должен ходить к Telegram через SSTP, но ответы клиентам с порта MTG_PORT
+# должны возвращаться через опубликованный Docker-порт, а не через ppp0.
+iptables -t mangle -D OUTPUT -m owner --uid-owner "${MTG_UID}" -j MARK --set-mark 0x1 2>/dev/null || true
+iptables -t mangle -D OUTPUT -p tcp -m tcp ! --sport "${MTG_PORT}" -m owner --uid-owner "${MTG_UID}" -j MARK --set-mark 0x1 2>/dev/null || true
+iptables -t mangle -C OUTPUT -p tcp -m tcp ! --sport "${MTG_PORT}" -m owner --uid-owner "${MTG_UID}" -j MARK --set-mark 0x1 2>/dev/null \
+  || iptables -t mangle -A OUTPUT -p tcp -m tcp ! --sport "${MTG_PORT}" -m owner --uid-owner "${MTG_UID}" -j MARK --set-mark 0x1
+iptables -t nat -D POSTROUTING -m mark --mark 0x1 -o "${IFNAME}" -j SNAT --to-source "${LOCAL_IP}" 2>/dev/null || true
+iptables -t nat -C POSTROUTING -m mark --mark 0x1 -o "${IFNAME}" -j SNAT --to-source "${LOCAL_IP}" 2>/dev/null \
+  || iptables -t nat -A POSTROUTING -m mark --mark 0x1 -o "${IFNAME}" -j SNAT --to-source "${LOCAL_IP}"
 
 iptables -t mangle -C OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1300 2>/dev/null \
   || iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1300

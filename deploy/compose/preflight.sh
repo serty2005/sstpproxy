@@ -22,6 +22,8 @@ fi
 "${PYTHON_BIN}" - "${ENV_FILE}" <<'PY'
 from __future__ import annotations
 
+import base64
+import binascii
 import sys
 from pathlib import Path
 
@@ -48,6 +50,33 @@ def fail(message: str) -> None:
 
 def warn(message: str) -> None:
     print(f"Предупреждение: {message}")
+
+
+def decode_mtproto_secret(secret: str) -> bytes:
+    if secret.lower().startswith("ee"):
+        try:
+            return bytes.fromhex(secret)
+        except ValueError as exc:
+            fail("MTPROTO_SECRET_VALUE с префиксом ee должен содержать только hex-символы")
+            raise AssertionError from exc
+
+    variants = [secret, secret.translate(str.maketrans("-_", "+/"))]
+    for candidate in variants:
+        padded = candidate + "=" * (-len(candidate) % 4)
+        try:
+            return base64.b64decode(padded, validate=True)
+        except binascii.Error:
+            continue
+    fail("MTPROTO_SECRET_VALUE должен быть base64 или hex-строкой с префиксом ee")
+    raise AssertionError
+
+
+def validate_mtproto_secret(secret: str) -> None:
+    raw = decode_mtproto_secret(secret)
+    if len(raw) < 17:
+        fail("MTPROTO_SECRET_VALUE должен содержать FakeTLS-префикс ee и минимум 16 байт ключа")
+    if raw[0] != 0xEE:
+        fail("MTPROTO_SECRET_VALUE должен быть FakeTLS secret для mtg v2 и начинаться с ee")
 
 
 env = parse_env(env_path)
@@ -115,6 +144,7 @@ if not mtproto_secret:
     fail("MTPROTO_SECRET_VALUE обязателен")
 if "replace" in mtproto_secret.lower():
     fail("MTPROTO_SECRET_VALUE задан шаблонным значением")
+validate_mtproto_secret(mtproto_secret)
 
 admin_token = env.get("CONTROL_PLANE_ADMIN_TOKEN", "")
 if not admin_token:

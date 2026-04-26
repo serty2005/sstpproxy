@@ -38,8 +38,25 @@ func (m *Manager) LoadSecret() (string, string, error) {
 	if secret == "" {
 		return "", "", fmt.Errorf("MTProto secret file пуст")
 	}
+	if err := ValidateSecret(secret); err != nil {
+		return "", "", err
+	}
 	sum := sha256.Sum256([]byte(secret))
 	return secret, hex.EncodeToString(sum[:]), nil
+}
+
+func ValidateSecret(secret string) error {
+	decoded, err := decodeSecret(secret)
+	if err != nil {
+		return fmt.Errorf("некорректный MTProto secret: %w", err)
+	}
+	if len(decoded) < 17 {
+		return fmt.Errorf("некорректный MTProto secret: FakeTLS secret должен содержать префикс ee и минимум 16 байт ключа")
+	}
+	if decoded[0] != 0xee {
+		return fmt.Errorf("некорректный MTProto secret: mtg v2 поддерживает только FakeTLS secret с префиксом ee")
+	}
+	return nil
 }
 
 func (m *Manager) Link(secret string) string {
@@ -85,4 +102,28 @@ func (m *Manager) WriteAtomic(path string, content []byte, mode fs.FileMode) err
 		}
 	}
 	return nil
+}
+
+func decodeSecret(secret string) ([]byte, error) {
+	if strings.HasPrefix(strings.ToLower(secret), "ee") {
+		raw, err := hex.DecodeString(secret)
+		if err != nil {
+			return nil, fmt.Errorf("hex secret с префиксом ee должен содержать только hex-символы")
+		}
+		return raw, nil
+	}
+
+	decoders := []*base64.Encoding{
+		base64.RawURLEncoding,
+		base64.RawStdEncoding,
+		base64.URLEncoding,
+		base64.StdEncoding,
+	}
+	for _, decoder := range decoders {
+		raw, err := decoder.DecodeString(secret)
+		if err == nil {
+			return raw, nil
+		}
+	}
+	return nil, fmt.Errorf("secret должен быть base64 или hex-строкой с префиксом ee")
 }
